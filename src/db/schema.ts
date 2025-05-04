@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -5,6 +6,10 @@ import {
   boolean,
   integer,
   serial,
+  jsonb,
+  real,
+  primaryKey,
+  json,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -83,14 +88,42 @@ export const apikey = pgTable("apikey", {
   metadata: text("metadata"),
 });
 
+// Workouts table, storing core exercise data
 export const workouts = pgTable("workouts", {
   id: serial("id").primaryKey(),
+  externalId: text("external_id").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
+  bodyPart: text("body_part"),
+  equipment: text("equipment"),
+  gifUrl: text("gif_url"),
+  target: text("target"),
+  secondaryMuscles: json("secondary_muscles").$type<string[]>(),
+  instructions: json("instructions").$type<string[]>(),
+  latestInstructions: json("latest_instructions").$type<string[]>(),
   isPublic: boolean("is_public").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Muscles reference table
+export const muscles = pgTable("muscles", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  groupName: text("group_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const workoutMuscleActivations = pgTable("workout_muscle_activations", {
+  id: serial("id").primaryKey(),
+  workoutId: integer("workout_id")
+    .notNull()
+    .references(() => workouts.id, { onDelete: "cascade" }), // ← part of your composite PK
+  muscleCode: text("muscle_code")
+    .notNull()
+    .references(() => muscles.code, { onDelete: "cascade" }),
+  isPrimary: boolean("is_primary").notNull(),
+  activation: real("activation").notNull(),
 });

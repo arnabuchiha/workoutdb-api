@@ -1,53 +1,37 @@
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
-import { Env } from "../../types";
-import { workouts } from "../../db/schema";
+import type { Env } from "../../types";
+import { WorkoutsController } from "../../controllers/workoutsController";
+import { DbClient } from "../../db";
 
-const router = new Hono<{ Bindings: Env }>();
+const router = new Hono<{
+  Bindings: Env;
+  Variables: {
+    db: DbClient;
+    user?: { id: string } | null;
+  };
+}>();
+const controller = new WorkoutsController();
 
-// Forward search requests to premium module
-router.get("/search", async (c) => {
-  const query = c.req.query("q");
-  if (!query) {
-    throw new HTTPException(400, { message: "Search query is required" });
-  }
+// Muscle-specific routes
+router.get("/muscles", (c) => controller.getMuscles(c));
+router.post("/muscles", (c) => controller.createMuscle(c));
+router.post("/muscles/batch", (c) => controller.createMuscleBulk(c));
 
-  // Create a new request to forward to the premium module
-  const url = new URL("/search", "http://internal");
-  url.searchParams.set("q", query);
-  const req = new Request(url, {
-    headers: new Headers(c.req.raw.headers),
-  });
-});
+// Premium feature routes
+router.get("/search/query", (c) => controller.searchWorkouts(c));
+router.get("/search/suggestions", (c) => controller.getWorkoutSuggestions(c));
+router.get("/:id/alternatives", (c) => controller.getAlternativeWorkouts(c));
 
-// Forward autocomplete requests to premium module
-router.get("/autocomplete", async (c) => {
-  const query = c.req.query("q");
-  if (!query) {
-    throw new HTTPException(400, { message: "Query parameter is required" });
-  }
+// Batch operations
+router.post("/batch", (c) => controller.createWorkoutInBulk(c));
 
-  const url = new URL("/autocomplete", "http://internal");
-  url.searchParams.set("q", query);
-  const req = new Request(url, {
-    headers: new Headers(c.req.raw.headers),
-  });
-});
+// Basic CRUD operations
+router.get("/:id", (c) => controller.getWorkoutById(c));
+router.put("/:id", (c) => controller.updateWorkout(c));
+router.delete("/:id", (c) => controller.deleteWorkout(c));
 
-// Forward alternates requests to premium module
-router.get("/alternates/:id", async (c) => {
-  const id = c.req.param("id");
-  console.log(c.env.BETTER_AUTH_SECRET);
-  const url = new URL(`/`, "http://internal");
-  const req = new Request(url, {
-    headers: new Headers(c.req.raw.headers),
-  });
-});
-router.get("/test", async (c) => {
-  const db = c.get("db");
-  const query = db.select().from(workouts);
-  // result.execute()
-  const result = await query.execute();
-  return c.json(result);
-});
+// Collection routes
+router.get("/", (c) => controller.getWorkouts(c));
+router.post("/", (c) => controller.createWorkout(c));
+
 export const workoutsRouter = router;
