@@ -23,3 +23,9 @@ ADD COLUMN search_vector tsvector GENERATED ALWAYS AS (
 ) STORED;
 
 CREATE INDEX workouts_search_vector_idx ON workouts USING gin(search_vector);
+
+/**
+create similarity index for 
+*/
+CREATE EXTENSION vector;
+

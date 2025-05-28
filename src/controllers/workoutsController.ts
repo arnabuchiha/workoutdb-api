@@ -303,17 +303,34 @@ export class WorkoutsController {
   async getAlternativeWorkouts(c: WorkoutContext) {
     try {
       const id = c.req.param("id");
+      const db = c.get("db");
 
-      // Business logic here:
-      // 1. Get workout details
-      // 2. Find similar workouts
-      // 3. Filter by difficulty, equipment, etc.
-      // 4. Return alternatives
+      // 1. Get the muscle vector for the target workout
+      const [target] = await db
+        .select({ muscleVector: workouts.muscleVector })
+        .from(workouts)
+        .where(eq(workouts.id, parseInt(id)))
+        .execute();
 
-      return c.json({
-        message: "Alternatives functionality to be implemented",
-      });
+      if (!target || !target.muscleVector) {
+        throw new HTTPException(404, {
+          message: "Workout or muscle vector not found",
+        });
+      }
+      const alternatives = await db
+        .select({
+          ...getTableColumns(workouts),
+          similarity: sql`1 - (muscle_vector <=> ${target.muscleVector})`,
+        })
+        .from(workouts)
+        .where(sql`id != ${id} AND muscle_vector IS NOT NULL`)
+        .orderBy(sql`muscle_vector <=> ${target.muscleVector}`)
+        .limit(10)
+        .execute();
+
+      return c.json(alternatives);
     } catch (error) {
+      console.error(error);
       throw new HTTPException(500, { message: "Failed to get alternatives" });
     }
   }

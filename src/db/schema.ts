@@ -22,6 +22,12 @@ export const tsvector = customType<{
   },
 });
 
+export const vector = customType<{ data: number[] }>({
+  dataType() {
+    return `vector(84)`;
+  },
+});
+
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -132,6 +138,7 @@ export const workouts = pgTable(
         'D'
       )`,
     ),
+    muscleVector: vector("muscle_vector"),
   },
   (table) => [
     index("workouts_search_vector_idx").using("gin", table.searchVector),
@@ -142,6 +149,10 @@ export const workouts = pgTable(
     index("workouts_description_trgm_idx").using(
       "gin",
       sql`${table.description} gin_trgm_ops`,
+    ),
+    index("workouts_muscle_vector_idx").using(
+      "hnsw",
+      table.muscleVector.op("vector_cosine_ops"),
     ),
   ],
 );
