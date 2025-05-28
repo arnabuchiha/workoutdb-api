@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { muscles, workouts, workoutMuscleActivations } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { Env } from "../types";
 import type { DbClient } from "../db";
 import { z } from "zod";
@@ -50,14 +50,15 @@ export class WorkoutsController {
   async getWorkouts(c: WorkoutContext) {
     try {
       const db = c.get("db");
+      const page = parseInt(c.req.query("page") || "1");
+      const pageSize = Math.min(parseInt(c.req.query("pageSize") || "20"), 50);
 
-      // Business logic here:
-      // 1. Get pagination parameters from query
-      // 2. Apply filters (public/private, by user, by date, etc.)
-      // 3. Execute query with pagination
-      // 4. Return formatted response
-
-      const result = await db.select().from(workouts).execute();
+      const result = await db
+        .select()
+        .from(workouts)
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .execute();
       return c.json(result);
     } catch (error) {
       throw new HTTPException(500, { message: "Failed to fetch workouts" });
@@ -204,22 +205,76 @@ export class WorkoutsController {
   async searchWorkouts(c: WorkoutContext) {
     try {
       const query = c.req.query("q");
+      const page = parseInt(c.req.query("page") || "1");
+      const pageSize = Math.min(parseInt(c.req.query("pageSize") || "20"), 50);
       if (!query) {
         throw new HTTPException(400, { message: "Search query is required" });
       }
+      const db = c.get("db");
 
-      // Business logic here:
-      // 1. Process search query
-      // 2. Apply search filters
-      // 3. Handle pagination
-      // 4. Return search results
+      const tsQuery = sql`plainto_tsquery('english', ${query})`;
 
-      return c.json({ message: "Search functionality to be implemented" });
+      const results = await db
+        .select({
+          ...getTableColumns(workouts),
+          rank: sql`ts_rank(workouts.search_vector, ${tsQuery})`,
+        })
+        .from(workouts)
+        .where(sql`workouts.search_vector @@ ${tsQuery}`)
+        .orderBy(sql`ts_rank(workouts.search_vector, ${tsQuery}) DESC`)
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .execute();
+      let combinedResults = results;
+      if (results.length < 5) {
+        const fuzzyResults = await db
+          .select({
+            ...getTableColumns(workouts),
+            rank: sql`GREATEST(similarity(name, ${query}), similarity(description, ${query}))`,
+          })
+          .from(workouts)
+          .where(
+            sql`similarity(name, ${query}) > 0.3 OR similarity(description, ${query}) > 0.3`,
+          )
+          .orderBy(
+            sql`GREATEST(similarity(name, ${query}), similarity(description, ${query})) DESC`,
+          )
+          .limit(pageSize)
+          .execute();
+        // Deduplicate by id (or externalId if that's the unique key)
+        const seenIds = new Set(results.map((r) => r.id));
+        const dedupedFuzzy = fuzzyResults.filter((r) => !seenIds.has(r.id));
+        combinedResults = [...results, ...dedupedFuzzy];
+      }
+      return c.json(combinedResults);
     } catch (error) {
+      console.error(error);
       throw new HTTPException(500, { message: "Search failed" });
     }
   }
+  async autoCompleteWorkout(c: WorkoutContext) {
+    try {
+      const query = c.req.query("q");
+      const db = c.get("db");
 
+      const tsQuery = sql`plainto_tsquery('english', ${query})`;
+
+      const results = await db
+        .select({
+          ...getTableColumns(workouts),
+          rank: sql`ts_rank(workouts.search_vector, ${tsQuery})`,
+        })
+        .from(workouts)
+        .where(sql`workouts.search_vector @@ ${tsQuery}`)
+        .orderBy(sql`ts_rank(workouts.search_vector, ${tsQuery}) DESC`)
+        .limit(20)
+        .execute();
+      return c.json(results);
+    } catch (error) {
+      console.error(error);
+      throw new HTTPException(500, { message: "Failed to get autocomplete" });
+    }
+  }
   // Get workout suggestions (autocomplete)
   async getWorkoutSuggestions(c: WorkoutContext) {
     try {

@@ -20,6 +20,7 @@ router.post("/muscles/batch", (c) => controller.createMuscleBulk(c));
 // Premium feature routes
 router.get("/search/query", (c) => controller.searchWorkouts(c));
 router.get("/search/suggestions", (c) => controller.getWorkoutSuggestions(c));
+router.get("/search/autocomplete", (c) => controller.autoCompleteWorkout(c));
 router.get("/:id/alternatives", (c) => controller.getAlternativeWorkouts(c));
 
 // Batch operations

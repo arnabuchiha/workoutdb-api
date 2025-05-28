@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, SQL, sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -10,7 +10,17 @@ import {
   real,
   primaryKey,
   json,
+  index,
+  customType,
 } from "drizzle-orm/pg-core";
+
+export const tsvector = customType<{
+  data: string;
+}>({
+  dataType() {
+    return `tsvector`;
+  },
+});
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -89,22 +99,52 @@ export const apikey = pgTable("apikey", {
 });
 
 // Workouts table, storing core exercise data
-export const workouts = pgTable("workouts", {
-  id: serial("id").primaryKey(),
-  externalId: text("external_id").notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description"),
-  bodyPart: text("body_part"),
-  equipment: text("equipment"),
-  gifUrl: text("gif_url"),
-  target: text("target"),
-  secondaryMuscles: json("secondary_muscles").$type<string[]>(),
-  instructions: json("instructions").$type<string[]>(),
-  latestInstructions: json("latest_instructions").$type<string[]>(),
-  isPublic: boolean("is_public").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+export const workouts = pgTable(
+  "workouts",
+  {
+    id: serial("id").primaryKey(),
+    externalId: text("external_id").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description"),
+    bodyPart: text("body_part"),
+    equipment: text("equipment"),
+    gifUrl: text("gif_url"),
+    target: text("target"),
+    secondaryMuscles: json("secondary_muscles").$type<string[]>(),
+    instructions: json("instructions").$type<string[]>(),
+    latestInstructions: json("latest_instructions").$type<string[]>(),
+    isPublic: boolean("is_public").default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      (): SQL =>
+        sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
+      setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
+      setweight(
+        json_to_tsvector('english', secondary_muscles,'"all"'),
+        'C'
+      ) ||
+      setweight(
+        to_tsvector(
+          'english',
+          coalesce(target, '') || ' ' || coalesce(body_part, '') || ' ' || coalesce(equipment, '')
+        ),
+        'D'
+      )`,
+    ),
+  },
+  (table) => [
+    index("workouts_search_vector_idx").using("gin", table.searchVector),
+    index("workouts_name_trgm_idx").using(
+      "gin",
+      sql`${table.name} gin_trgm_ops`,
+    ),
+    index("workouts_description_trgm_idx").using(
+      "gin",
+      sql`${table.description} gin_trgm_ops`,
+    ),
+  ],
+);
 
 // Muscles reference table
 export const muscles = pgTable("muscles", {
