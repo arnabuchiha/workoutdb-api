@@ -6,6 +6,9 @@ import { errorHandler } from "./middleware/errorHandler";
 import { authRouter } from "./routes/authRoute";
 import { healthRouter } from "./routes/health";
 import { workoutsRouter } from "./routes/workouts";
+import { musclesRouter } from "./routes/muscles";
+import { equipmentRouter } from "./routes/equipment";
+import { bodyPartRouter } from "./routes/bodyPart";
 import { auth } from "./utils/auth";
 import { Env } from "./types";
 import { createDbClient } from "./db";
@@ -52,5 +55,8 @@ app.route("/auth", authRouter);
 // app.use("/api/*", apiKeyMiddleware);
 // app.use("/api/*", rateLimitMiddleware);
 app.route("/api/workouts", workoutsRouter);
+app.route("/api/muscles", musclesRouter);
+app.route("/api/equipment", equipmentRouter);
+app.route("/api/body-parts", bodyPartRouter);
 
 export default app;

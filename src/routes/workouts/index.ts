@@ -12,11 +12,6 @@ const router = new Hono<{
 }>();
 const controller = new WorkoutsController();
 
-// Muscle-specific routes
-router.get("/muscles", (c) => controller.getMuscles(c));
-router.post("/muscles", (c) => controller.createMuscle(c));
-router.post("/muscles/batch", (c) => controller.createMuscleBulk(c));
-
 // Premium feature routes
 router.get("/search/query", (c) => controller.searchWorkouts(c));
 router.get("/search/suggestions", (c) => controller.getWorkoutSuggestions(c));

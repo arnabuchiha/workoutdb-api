@@ -5,6 +5,7 @@ import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { Env } from "../types";
 import type { DbClient } from "../db";
 import { z } from "zod";
+import { BulkWorkoutArraySchema } from "../schemas/workout";
 
 type WorkoutContext = Context<{
   Bindings: Env;
@@ -13,37 +14,6 @@ type WorkoutContext = Context<{
     user?: { id: string } | null;
   };
 }>;
-const MuscleSchema = z.object({
-  Code: z.string(),
-  Muscle: z.string(),
-  Group: z.string(),
-});
-const MuscleArraySchema = z.array(MuscleSchema);
-
-const MuscleActivationSchema = z.object({
-  code: z.string(),
-  activation: z.number().min(0).max(1),
-});
-
-const WorkoutMuscleActivationSchema = z.object({
-  primary_muscle: z.array(MuscleActivationSchema),
-  secondary_muscle: z.array(MuscleActivationSchema),
-});
-
-const BulkWorkoutSchema = z.object({
-  bodyPart: z.string(),
-  equipment: z.string(),
-  gifUrl: z.string().url(),
-  id: z.string(),
-  name: z.string(),
-  target: z.string(),
-  secondaryMuscles: z.array(z.string()),
-  instructions: z.array(z.string()),
-  latest_instructions: z.array(z.string()),
-  muscleActivation: WorkoutMuscleActivationSchema,
-});
-
-const BulkWorkoutArraySchema = z.array(BulkWorkoutSchema);
 
 export class WorkoutsController {
   // Get all workouts (with pagination and filters)
@@ -52,14 +22,20 @@ export class WorkoutsController {
       const db = c.get("db");
       const page = parseInt(c.req.query("page") || "1");
       const pageSize = Math.min(parseInt(c.req.query("pageSize") || "20"), 50);
-
+      const { muscleVector, searchVector, ...selectedColumns } =
+        getTableColumns(workouts);
       const result = await db
-        .select()
+        .select({ ...selectedColumns })
         .from(workouts)
         .offset((page - 1) * pageSize)
         .limit(pageSize)
         .execute();
-      return c.json(result);
+      return c.json({
+        data: result,
+        page,
+        pageSize,
+        total: result.length,
+      });
     } catch (error) {
       throw new HTTPException(500, { message: "Failed to fetch workouts" });
     }
@@ -213,10 +189,11 @@ export class WorkoutsController {
       const db = c.get("db");
 
       const tsQuery = sql`plainto_tsquery('english', ${query})`;
-
+      const { muscleVector, searchVector, ...selectedColumns } =
+        getTableColumns(workouts);
       const results = await db
         .select({
-          ...getTableColumns(workouts),
+          ...selectedColumns,
           rank: sql`ts_rank(workouts.search_vector, ${tsQuery})`,
         })
         .from(workouts)
@@ -246,7 +223,12 @@ export class WorkoutsController {
         const dedupedFuzzy = fuzzyResults.filter((r) => !seenIds.has(r.id));
         combinedResults = [...results, ...dedupedFuzzy];
       }
-      return c.json(combinedResults);
+      return c.json({
+        data: combinedResults,
+        page,
+        pageSize,
+        total: combinedResults.length,
+      });
     } catch (error) {
       console.error(error);
       throw new HTTPException(500, { message: "Search failed" });
@@ -304,7 +286,11 @@ export class WorkoutsController {
     try {
       const id = c.req.param("id");
       const db = c.get("db");
-
+      const page = parseInt(c.req.query("page") || "1");
+      const pageSize = Math.min(parseInt(c.req.query("pageSize") || "20"), 50);
+      //Remove columns from selected Columns
+      const { muscleVector, searchVector, ...selectedColumns } =
+        getTableColumns(workouts);
       // 1. Get the muscle vector for the target workout
       const [target] = await db
         .select({ muscleVector: workouts.muscleVector })
@@ -319,16 +305,22 @@ export class WorkoutsController {
       }
       const alternatives = await db
         .select({
-          ...getTableColumns(workouts),
+          ...selectedColumns,
           similarity: sql`1 - (muscle_vector <=> ${target.muscleVector})`,
         })
         .from(workouts)
         .where(sql`id != ${id} AND muscle_vector IS NOT NULL`)
         .orderBy(sql`muscle_vector <=> ${target.muscleVector}`)
-        .limit(10)
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
         .execute();
 
-      return c.json(alternatives);
+      return c.json({
+        data: alternatives,
+        page,
+        pageSize,
+        total: alternatives.length,
+      });
     } catch (error) {
       console.error(error);
       throw new HTTPException(500, { message: "Failed to get alternatives" });
@@ -417,97 +409,6 @@ export class WorkoutsController {
       console.error(error);
       throw new HTTPException(500, {
         message: "Failed to create workouts in bulk",
-      });
-    }
-  }
-
-  async createMuscle(c: WorkoutContext) {
-    try {
-      const payload = await c.req.json();
-      const db = c.get("db");
-      const musclesToInsert = MuscleSchema.parse(payload);
-
-      const inserted = await db
-        .insert(muscles)
-        .values({
-          code: musclesToInsert.Code,
-          name: musclesToInsert.Muscle,
-          groupName: musclesToInsert.Group,
-        })
-        .returning();
-
-      return c.json({
-        message: "Muscles created successfully",
-        count: inserted.length,
-        data: inserted,
-      });
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        throw new HTTPException(400, {
-          message: `Invalid payload format: ${err.errors.map((e) => e.message).join(", ")}`,
-        });
-      }
-
-      console.error(err);
-      throw new HTTPException(500, {
-        message: "Failed to create muscles",
-      });
-    }
-  }
-
-  async createMuscleBulk(c: WorkoutContext) {
-    try {
-      const payload = await c.req.json();
-      const db = c.get("db");
-      const musclesToInsert = MuscleArraySchema.parse(payload);
-
-      const inserted = await db
-        .insert(muscles)
-        .values(
-          musclesToInsert.map(({ Code, Muscle, Group }) => ({
-            code: Code,
-            name: Muscle,
-            groupName: Group,
-          })),
-        )
-        .returning();
-
-      return c.json({
-        message: "Muscles created successfully",
-        count: inserted.length,
-        data: inserted,
-      });
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        throw new HTTPException(400, {
-          message: `Invalid payload format: ${err.errors.map((e) => e.message).join(", ")}`,
-        });
-      }
-
-      console.error(err);
-      throw new HTTPException(500, {
-        message: "Failed to create muscles",
-      });
-    }
-  }
-
-  async getMuscles(c: WorkoutContext) {
-    try {
-      const db = c.get("db");
-
-      const result = await db.select().from(muscles).execute();
-
-      return c.json(result);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        throw new HTTPException(400, {
-          message: `Invalid payload format: ${err.errors.map((e) => e.message).join(", ")}`,
-        });
-      }
-
-      console.error(err);
-      throw new HTTPException(500, {
-        message: "Failed to create muscles",
       });
     }
   }
