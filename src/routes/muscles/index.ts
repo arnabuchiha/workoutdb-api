@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../../types";
 import { MusclesController } from "../../controllers/musclesController";
 import { DbClient } from "../../db";
+import { AdminCheck } from "../../middleware/roleCheck";
 
 const router = new Hono<{
   Bindings: Env;
@@ -15,8 +16,8 @@ const controller = new MusclesController();
 
 // Muscle routes
 router.get("/", (c) => controller.getMuscles(c));
-router.post("/", (c) => controller.createMuscle(c));
-router.post("/batch", (c) => controller.createMuscleBulk(c));
+router.post("/", AdminCheck(), (c) => controller.createMuscle(c));
+router.post("/batch", AdminCheck(), (c) => controller.createMuscleBulk(c));
 router.get("/:muscleId/workouts", (c) => controller.getWorkoutsByMuscle(c));
 
 export const musclesRouter = router;
