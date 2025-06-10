@@ -24,15 +24,15 @@ const app = new Hono<{
 }>();
 
 // Middleware to initialize Supabase client and Drizzle
-app.use("*", async (c, next) => {
+app.use("/api/*", async (c, next) => {
   const db = createDbClient(c.env.DATABASE_URL);
   c.set("db", db);
   await next();
 });
 
 // Global middleware
-app.use("*", logger());
-app.use("*", errorHandler());
+app.use("/api/*", logger());
+app.use("/api/*", errorHandler());
 // app.use("/api/*", async (c, next) => {
 //   const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
@@ -48,8 +48,8 @@ app.use("*", errorHandler());
 // });
 // API routes
 
-app.route("/health", healthRouter);
-app.route("/auth", authRouter);
+app.route("/api/health", healthRouter);
+app.route("/api/auth", authRouter);
 
 // Protected routes
 // app.use("/api/*", apiKeyMiddleware);

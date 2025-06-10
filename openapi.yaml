@@ -1,0 +1,568 @@
+openapi: 3.1.0
+info:
+  title: Workout Database API
+  version: 1.0.0
+  description: API for managing workouts, muscles, equipment, and body parts
+
+servers:
+  - url: /api
+    description: API base URL
+
+tags:
+  - name: Workouts
+    description: Endpoints for managing workouts and exercises
+  - name: Muscles
+    description: Endpoints for managing muscles and muscle-related data
+  - name: Equipment
+    description: Endpoints for managing exercise equipment
+  - name: Body Parts
+    description: Endpoints for managing body parts
+
+components:
+  schemas:
+    Workout:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the workout
+        externalId:
+          type: string
+          description: External identifier for the workout
+        name:
+          type: string
+          description: Name of the workout
+        description:
+          type: string
+          description: Description of the workout
+        bodyPart:
+          type: string
+          description: Target body part
+        equipment:
+          type: string
+          description: Equipment used
+        gifUrl:
+          type: string
+          format: uri
+          description: URL to the workout GIF
+        target:
+          type: string
+          description: Target muscle group
+        secondaryMuscles:
+          type: array
+          items:
+            type: string
+          description: Secondary muscles involved
+        instructions:
+          type: array
+          items:
+            type: string
+          description: Workout instructions
+        latestInstructions:
+          type: array
+          items:
+            type: string
+          description: Latest workout instructions
+        isPublic:
+          type: boolean
+          description: Whether the workout is public
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Muscle:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the muscle
+        code:
+          type: string
+          description: Unique code for the muscle
+        name:
+          type: string
+          description: Name of the muscle
+        groupName:
+          type: string
+          description: Group name of the muscle
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MuscleActivation:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Muscle code
+        activation:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Activation level of the muscle
+
+    WorkoutMuscleActivation:
+      type: object
+      properties:
+        primary_muscle:
+          type: array
+          items:
+            $ref: "#/components/schemas/MuscleActivation"
+        secondary_muscle:
+          type: array
+          items:
+            $ref: "#/components/schemas/MuscleActivation"
+
+    PaginatedResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+        page:
+          type: integer
+          description: Current page number
+        pageSize:
+          type: integer
+          description: Number of items per page
+        total:
+          type: integer
+          description: Total number of items
+
+paths:
+  /workouts:
+    get:
+      tags:
+        - Workouts
+      summary: Get all workouts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of workouts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Workout"
+
+    post:
+      tags:
+        - Workouts
+      summary: Create a new workout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Workout"
+      responses:
+        "201":
+          description: Workout created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workout"
+
+  /workouts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags:
+        - Workouts
+      summary: Get workout by ID
+      responses:
+        "200":
+          description: Workout details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workout"
+    put:
+      tags:
+        - Workouts
+      summary: Update workout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Workout"
+      responses:
+        "200":
+          description: Workout updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workout"
+    delete:
+      tags:
+        - Workouts
+      summary: Delete workout
+      responses:
+        "200":
+          description: Workout deleted successfully
+
+  /workouts/search/query:
+    get:
+      tags:
+        - Workouts
+      summary: Search workouts
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/Workout"
+                            - type: object
+                              properties:
+                                rank:
+                                  type: number
+                                  format: float
+
+  /workouts/{id}/alternatives:
+    get:
+      tags:
+        - Workouts
+      summary: Get alternative workouts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Alternative workouts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/Workout"
+                            - type: object
+                              properties:
+                                similarity:
+                                  type: number
+                                  format: float
+
+  /muscles:
+    get:
+      tags:
+        - Muscles
+      summary: Get all muscles
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of muscles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Muscle"
+
+    post:
+      tags:
+        - Muscles
+      summary: Create a new muscle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Code:
+                  type: string
+                Muscle:
+                  type: string
+                Group:
+                  type: string
+      responses:
+        "201":
+          description: Muscle created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Muscle"
+
+  /muscles/{muscleId}/workouts:
+    get:
+      tags:
+        - Muscles
+      summary: Get workouts by muscle
+      parameters:
+        - name: muscleId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+        - name: isPrimary
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Workouts for the muscle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/Workout"
+                            - type: object
+                              properties:
+                                activation:
+                                  type: number
+                                  format: float
+                                isPrimary:
+                                  type: boolean
+                      muscle:
+                        $ref: "#/components/schemas/Muscle"
+
+  /equipment:
+    get:
+      tags:
+        - Equipment
+      summary: Get all equipment
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of equipment
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: string
+
+  /equipment/{equipment}/workouts:
+    get:
+      tags:
+        - Equipment
+      summary: Get workouts by equipment
+      parameters:
+        - name: equipment
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Workouts for the equipment
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Workout"
+                      equipment:
+                        type: string
+
+  /body-parts:
+    get:
+      tags:
+        - Body Parts
+      summary: Get all body parts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: List of body parts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: string
+
+  /body-parts/{bodyPart}/workouts:
+    get:
+      tags:
+        - Body Parts
+      summary: Get workouts by body part
+      parameters:
+        - name: bodyPart
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Workouts for the body part
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Workout"
+                      bodyPart:
+                        type: string
