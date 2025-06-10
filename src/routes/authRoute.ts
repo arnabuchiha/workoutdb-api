@@ -19,8 +19,7 @@ router.post("/login", async (c) => {
       password,
     },
   });
-  // In a real application, you would validate credentials against a database
-  // and use proper password hashing
+
   return c.json({
     success: true,
     token: signedIn.token,
@@ -49,11 +48,6 @@ router.post("/register", async (c) => {
       },
     });
     console.log(registered);
-    // In a real application, you would:
-    // 1. Validate the email format
-    // 2. Hash the password
-    // 3. Check for existing users
-    // 4. Store in database
     return c.json({
       success: true,
       message: "User registered successfully",

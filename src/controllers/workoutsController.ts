@@ -47,11 +47,6 @@ export class WorkoutsController {
       const id = c.req.param("id");
       const db = c.get("db");
 
-      // Business logic here:
-      // 1. Validate workout exists
-      // 2. Check access permissions (public/private)
-      // 3. Return workout with related data
-
       const result = await db
         .select()
         .from(workouts)
@@ -79,12 +74,6 @@ export class WorkoutsController {
       if (!userId) {
         throw new HTTPException(401, { message: "Authentication required" });
       }
-
-      // Business logic here:
-      // 1. Validate request body
-      // 2. Process and sanitize input
-      // 3. Add metadata (userId, timestamps)
-      // 4. Create workout record
 
       const result = await db
         .insert(workouts)
@@ -115,12 +104,6 @@ export class WorkoutsController {
       if (!userId) {
         throw new HTTPException(401, { message: "Authentication required" });
       }
-
-      // Business logic here:
-      // 1. Validate workout exists
-      // 2. Check ownership/permissions
-      // 3. Validate and sanitize updates
-      // 4. Apply updates
 
       const result = await db
         .update(workouts)
@@ -153,12 +136,6 @@ export class WorkoutsController {
       if (!userId) {
         throw new HTTPException(401, { message: "Authentication required" });
       }
-
-      // Business logic here:
-      // 1. Validate workout exists
-      // 2. Check ownership/permissions
-      // 3. Handle related records (if any)
-      // 4. Delete workout
 
       const result = await db
         .delete(workouts)
@@ -267,12 +244,6 @@ export class WorkoutsController {
         });
       }
 
-      // Business logic here:
-      // 1. Process query string
-      // 2. Get matching workout names
-      // 3. Format suggestions
-      // 4. Return top N suggestions
-
       return c.json({
         message: "Autocomplete functionality to be implemented",
       });
@@ -331,13 +302,7 @@ export class WorkoutsController {
     try {
       const payload = await c.req.json();
       const db = c.get("db");
-      // const userId = c.get("user")?.id;
 
-      // if (!userId) {
-      //   throw new HTTPException(401, { message: "Authentication required" });
-      // }
-
-      // Validate the payload
       const workoutsToInsert = BulkWorkoutArraySchema.parse(payload);
 
       // Use a transaction to ensure all related data is inserted

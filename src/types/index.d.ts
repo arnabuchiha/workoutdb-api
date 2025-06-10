@@ -9,15 +9,13 @@ export interface Env {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   DATABASE_URL: string;
-  // Add other environment variables as needed
+  RAPID_API_SECRET: string;
+  ADMIN_KEY: string;
 }
 
-// Extend Bindings for Cloudflare Workers
 declare global {
   interface Bindings extends Env {}
 }
-
-// Add database client to Hono context
 declare module "hono" {
   interface ContextVariableMap {
     db: DbClient;

@@ -1,8 +1,6 @@
 import { Hono } from "hono";
 import { logger } from "./utils/logger";
 import { errorHandler } from "./middleware/errorHandler";
-
-// Import routes
 import { authRouter } from "./routes/authRoute";
 import { healthRouter } from "./routes/health";
 import { workoutsRouter } from "./routes/workouts";
@@ -25,6 +23,11 @@ const app = new Hono<{
 
 // Middleware to initialize Supabase client and Drizzle
 app.use("/api/*", async (c, next) => {
+  const rapidApiKey = c.env.RAPID_API_SECRET;
+  const reqSecret = c.req.header("X-RapidAPI-Proxy-Secret");
+  if (c.env.ENVIRONMENT === "production" && reqSecret !== rapidApiKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const db = createDbClient(c.env.DATABASE_URL);
   c.set("db", db);
   await next();
