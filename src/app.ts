@@ -11,6 +11,7 @@ import { auth } from "./utils/auth";
 import { Env } from "./types";
 import { createDbClient } from "./db";
 import type { DbClient } from "./db";
+import { scalarDocs } from "./controllers/docsController";
 
 const app = new Hono<{
   Variables: {
@@ -62,4 +63,5 @@ app.route("/api/muscles", musclesRouter);
 app.route("/api/equipment", equipmentRouter);
 app.route("/api/body-parts", bodyPartRouter);
 
+app.get("/docs", scalarDocs);
 export default app;
