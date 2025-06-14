@@ -21,7 +21,12 @@ const app = new Hono<{
   };
   Bindings: Env;
 }>();
-
+app.use("/api/*", async (c, next) => {
+  const db = createDbClient(c.env.DATABASE_URL);
+  c.set("db", db);
+  await next();
+});
+app.route("/api/health", healthRouter);
 // Middleware to initialize Supabase client and Drizzle
 app.use("/api/*", async (c, next) => {
   const rapidApiKey = c.env.RAPID_API_SECRET;
@@ -29,11 +34,10 @@ app.use("/api/*", async (c, next) => {
   if (c.env.ENVIRONMENT === "production" && reqSecret !== rapidApiKey) {
     return c.json({ error: "Unauthorized" }, 401);
   }
-  const db = createDbClient(c.env.DATABASE_URL);
-  c.set("db", db);
+
   await next();
 });
-app.route("/api/health", healthRouter);
+
 // Global middleware
 app.use("/api/*", logger());
 app.use("/api/*", errorHandler());
