@@ -8,9 +8,10 @@
   "assets": {
     "directory": "public",
   },
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "API_VERSION": "v1",
+  },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",

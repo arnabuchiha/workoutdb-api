@@ -33,7 +33,7 @@ app.use("/api/*", async (c, next) => {
   c.set("db", db);
   await next();
 });
-
+app.route("/api/health", healthRouter);
 // Global middleware
 app.use("/api/*", logger());
 app.use("/api/*", errorHandler());
@@ -52,7 +52,6 @@ app.use("/api/*", errorHandler());
 // });
 // API routes
 
-app.route("/api/health", healthRouter);
 app.route("/api/auth", authRouter);
 
 // Protected routes
