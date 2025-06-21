@@ -17,7 +17,15 @@ router.get("/search/query", (c) => controller.searchWorkouts(c));
 router.get("/search/suggestions", (c) => controller.getWorkoutSuggestions(c));
 router.get("/search/autocomplete", (c) => controller.autoCompleteWorkout(c));
 router.get("/:id/alternatives", (c) => controller.getAlternativeWorkouts(c));
-
+router.get("/muscleActivations", (c) =>
+  controller.getWorkoutMuscleActivations(c),
+);
+router.get("/:id/muscleActivations", (c) =>
+  controller.getMuscleActivationsByWorkoutId(c),
+);
+router.put("/batch/update", AdminCheck(), (c) =>
+  controller.updateWorkoutInBulk(c),
+);
 router.post("/batch", AdminCheck(), (c) => controller.createWorkoutInBulk(c));
 
 router.get("/:id", (c) => controller.getWorkoutById(c));

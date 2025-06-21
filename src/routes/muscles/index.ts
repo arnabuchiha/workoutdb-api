@@ -19,5 +19,8 @@ router.get("/", (c) => controller.getMuscles(c));
 router.post("/", AdminCheck(), (c) => controller.createMuscle(c));
 router.post("/batch", AdminCheck(), (c) => controller.createMuscleBulk(c));
 router.get("/:muscleId/workouts", (c) => controller.getWorkoutsByMuscle(c));
+router.put("/activations/bulk", AdminCheck(), (c) =>
+  controller.updateMuscleActivationBulk(c),
+);
 
 export const musclesRouter = router;

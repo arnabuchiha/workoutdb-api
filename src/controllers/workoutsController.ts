@@ -5,7 +5,11 @@ import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { Env } from "../types";
 import type { DbClient } from "../db";
 import { z } from "zod";
-import { BulkWorkoutArraySchema } from "../schemas/workout";
+import {
+  BulkUpdateWorkoutArraySchema,
+  BulkWorkoutArraySchema,
+  UpdateWorkoutSchema,
+} from "../schemas/workout";
 
 type WorkoutContext = Context<{
   Bindings: Env;
@@ -297,7 +301,205 @@ export class WorkoutsController {
       throw new HTTPException(500, { message: "Failed to get alternatives" });
     }
   }
+  async getMuscleActivationsByWorkoutId(c: WorkoutContext) {
+    try {
+      const id = parseInt(c.req.param("id"));
+      if (isNaN(id)) {
+        throw new HTTPException(400, { message: "Invalid workout ID" });
+      }
 
+      const db = c.get("db");
+
+      // First verify the workout exists
+      const workout = await db
+        .select({
+          id: workouts.id,
+          name: workouts.name,
+        })
+        .from(workouts)
+        .where(eq(workouts.id, id))
+        .execute();
+
+      if (!workout.length) {
+        throw new HTTPException(404, { message: "Workout not found" });
+      }
+
+      // Get muscle activations for the workout
+      const rawResult = await db
+        .select({
+          muscleCode: workoutMuscleActivations.muscleCode,
+          activation: workoutMuscleActivations.activation,
+          isPrimary: workoutMuscleActivations.isPrimary,
+          muscle: {
+            code: muscles.code,
+            name: muscles.name,
+            groupName: muscles.groupName,
+          },
+        })
+        .from(workoutMuscleActivations)
+        .innerJoin(
+          muscles,
+          eq(workoutMuscleActivations.muscleCode, muscles.code),
+        )
+        .where(eq(workoutMuscleActivations.workoutId, id))
+        .orderBy(workoutMuscleActivations.activation)
+        .execute();
+      const result = {
+        id: workout[0].id,
+        name: workout[0].name,
+        activations: [...rawResult],
+      } as {
+        id: number;
+        name: string;
+        activations: {
+          muscleCode: string;
+          activation: number;
+          isPrimary: boolean;
+          muscle: { code: string; name: string; groupName: string };
+        }[];
+      };
+
+      return c.json({
+        data: result,
+      });
+    } catch (err) {
+      if (err instanceof HTTPException) throw err;
+      console.error(err);
+      throw new HTTPException(500, {
+        message: "Failed to get muscle activations for workout",
+      });
+    }
+  }
+
+  async getWorkoutMuscleActivations(c: WorkoutContext) {
+    try {
+      const db = c.get("db");
+      const page = Number.parseInt(c.req.query("page") || "1");
+      const pageSize = Math.min(
+        Number.parseInt(c.req.query("pageSize") || "50"),
+        100,
+      );
+      const limitWorkouts = db.$with("sq").as(
+        db
+          .select()
+          .from(workouts)
+          .offset((page - 1) * pageSize)
+          .limit(pageSize),
+      );
+      const flatResults = await db
+        .with(limitWorkouts)
+        .select({
+          id: limitWorkouts.id,
+          name: limitWorkouts.name,
+          muscleCode: workoutMuscleActivations.muscleCode,
+          activation: workoutMuscleActivations.activation,
+          isPrimary: workoutMuscleActivations.isPrimary,
+          muscle: {
+            code: muscles.code,
+            name: muscles.name,
+            groupName: muscles.groupName,
+          },
+        })
+        .from(limitWorkouts)
+        .innerJoin(
+          workoutMuscleActivations,
+          eq(workoutMuscleActivations.workoutId, limitWorkouts.id),
+        )
+        .innerJoin(
+          muscles,
+          eq(workoutMuscleActivations.muscleCode, muscles.code),
+        )
+        .orderBy(workoutMuscleActivations.activation)
+        .execute();
+      const groupResults = flatResults.reduce(
+        (accumulator, row) => {
+          const { id, name, ...muscleData } = row;
+          if (!accumulator[id]) {
+            accumulator[id] = {
+              id,
+              name,
+              activations: [],
+            };
+          }
+          accumulator[id].activations.push(muscleData);
+
+          return accumulator;
+        },
+        {} as Record<
+          string,
+          {
+            id: number;
+            name: string;
+            activations: {
+              muscleCode: string;
+              activation: number;
+              isPrimary: boolean;
+              muscle: { code: string; name: string; groupName: string };
+            }[];
+          }
+        >,
+      );
+      const results = Object.values(groupResults);
+      return c.json({
+        data: results,
+        page,
+        pageSize,
+        total: results.length,
+      });
+    } catch (err) {
+      if (err instanceof HTTPException) throw err;
+      console.error(err);
+      throw new HTTPException(500, {
+        message: "Failed to get muscle activations for workout",
+      });
+    }
+  }
+  async updateWorkoutInBulk(c: WorkoutContext) {
+    try {
+      const payload = await c.req.json();
+      const db = c.get("db");
+
+      const workoutsToUpdate = BulkUpdateWorkoutArraySchema.parse(payload);
+      const result = await db.transaction(async (trx) => {
+        const updatedWorkouts = [];
+        for (const workout of workoutsToUpdate) {
+          if (
+            !workout.id ||
+            (workout.youtube_link && workout.youtube_link.startsWith("Error"))
+          )
+            continue;
+          const updateData = Object.fromEntries(
+            Object.entries({
+              name: workout.name,
+              description: workout.description,
+              bodyPart: workout.bodyPart,
+              equipment: workout.equipment,
+              target: workout.target,
+              secondaryMuscles: workout.secondaryMuscles,
+              instructions: workout.instructions,
+              latestInstructions: workout.latest_instructions,
+              isPublic: true,
+              youtubeLink: workout.youtube_link,
+              updatedAt: new Date(),
+            }).filter(([_, v]) => v !== undefined),
+          );
+          const [updatedWorkout] = await trx
+            .update(workouts)
+            .set(updateData)
+            .where(eq(workouts.id, Number.parseInt(workout.id.toString())))
+            .returning();
+          updatedWorkouts.push(updatedWorkout);
+        }
+        return updatedWorkouts;
+      });
+      return c.json({ status: "Workouts updated successfully", result });
+    } catch (err) {
+      console.log(err);
+      throw new HTTPException(500, {
+        message: "Failed to update workouts",
+      });
+    }
+  }
   async createWorkoutInBulk(c: WorkoutContext) {
     try {
       const payload = await c.req.json();
@@ -314,17 +516,17 @@ export class WorkoutsController {
           const [insertedWorkout] = await tx
             .insert(workouts)
             .values({
-              externalId: workout.id,
+              externalId: workout.id.toString(),
               name: workout.name,
               description: "", // Add if needed
               bodyPart: workout.bodyPart,
               equipment: workout.equipment,
-              gifUrl: workout.gifUrl,
               target: workout.target,
               secondaryMuscles: workout.secondaryMuscles,
               instructions: workout.instructions,
               latestInstructions: workout.latest_instructions,
               isPublic: true, // Set based on your requirements
+              youtubeLink: workout.youtube_link,
               createdAt: new Date(),
               updatedAt: new Date(),
             })

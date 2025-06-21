@@ -114,7 +114,6 @@ export const workouts = pgTable(
     description: text("description"),
     bodyPart: text("body_part"),
     equipment: text("equipment"),
-    gifUrl: text("gif_url"),
     target: text("target"),
     secondaryMuscles: json("secondary_muscles").$type<string[]>(),
     instructions: json("instructions").$type<string[]>(),
@@ -122,6 +121,7 @@ export const workouts = pgTable(
     isPublic: boolean("is_public").default(false),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
+    youtubeLink: text("youtube_link").default(""),
     searchVector: tsvector("search_vector").generatedAlwaysAs(
       (): SQL =>
         sql`setweight(to_tsvector('english', coalesce(name, '')), 'A') ||

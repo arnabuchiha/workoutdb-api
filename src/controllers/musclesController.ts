@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { muscles, workouts, workoutMuscleActivations } from "../db/schema";
 import { MuscleSchema, MuscleArraySchema } from "../schemas/muscle";
-import { eq, and, getTableColumns } from "drizzle-orm";
+import { eq, and, getTableColumns, inArray } from "drizzle-orm";
 
 type MuscleContext = Context<{
   Bindings: Env;
@@ -179,6 +179,39 @@ export class MusclesController {
       throw new HTTPException(500, {
         message: "Failed to get workouts by muscle",
       });
+    }
+  }
+  async updateMuscleActivationBulk(c: MuscleContext) {
+    try {
+      const db = c.get("db");
+      const activationData: {
+        workout_id: number;
+        name: string;
+        muscle_code: string;
+        activation: number;
+      }[] = await c.req.json();
+      const workoutIds = activationData.map((row) => {
+        return row.workout_id;
+      });
+      await db.transaction(async (tsx) => {
+        await tsx
+          .delete(workoutMuscleActivations)
+          .where(inArray(workoutMuscleActivations.workoutId, workoutIds));
+        activationData.forEach(async (row) => {
+          await tsx.insert(workoutMuscleActivations).values({
+            workoutId: row.workout_id,
+            muscleCode: row.muscle_code,
+            isPrimary: row.activation >= 0.9 ? true : false,
+            activation: row.activation,
+          });
+        });
+      });
+      return c.json({
+        status: "Success",
+        message: "Successfully updated muscle activations",
+      });
+    } catch (err) {
+      return c.json({ status: "Failed", message: err }, 500);
     }
   }
 }
