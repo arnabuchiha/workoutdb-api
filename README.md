@@ -126,6 +126,18 @@ Beyond names and categories, each workout entry includes:
 
 ---
 
+## 📝 TODO List
+
+- [x] Alternate workouts using Muscle activations using vectors
+- [x] Search Workout using Postgres indexing
+- [ ] Work on Autocomplete keywords
+- [ ] Add Workout images
+- [ ] Add feature to get bodypart on image by body part id
+- [ ] Add Redis cache for fast data access
+- [ ] Move search index to cache
+
+---
+
 ## **Terms of Use**
 
 <details>
