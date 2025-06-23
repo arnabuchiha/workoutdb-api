@@ -2,10 +2,12 @@ openapi: 3.1.0
 info:
   title: Workout Database API
   version: 1.0.0
-  description: API for managing workouts, muscles, equipment, and body parts
+  description: API for managing workouts, muscles, equipment, and body parts.
+    <br/>To access the api you need to signup to Rapid API and get the x-rapidapi-key.
+    <br/>Link to Rapid API - https://rapidapi.com/ad733943/api/workout-db-api
 
 servers:
-  - url: /api
+  - url: https://workout-db-api.p.rapidapi.com
     description: API base URL
 
 tags:
@@ -205,6 +207,13 @@ components:
       description: Array of muscle objects to create in bulk.
       items:
         $ref: "#/components/schemas/MuscleCreate"
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-rapidapi-key
+security:
+  - ApiKeyAuth: []
 
 paths:
   /workouts:
