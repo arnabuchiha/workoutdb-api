@@ -17,6 +17,8 @@ tags:
     description: Endpoints for managing exercise equipment
   - name: Body Parts
     description: Endpoints for managing body parts
+  - name: Health
+    description: Health check endpoints
 
 components:
   schemas:
@@ -41,10 +43,6 @@ components:
         equipment:
           type: string
           description: Equipment used
-        gifUrl:
-          type: string
-          format: uri
-          description: URL to the workout GIF
         target:
           type: string
           description: Target muscle group
@@ -137,6 +135,77 @@ components:
           type: integer
           description: Total number of items
 
+    WorkoutUpdate:
+      type: object
+      description: |
+        Schema for updating a workout. All fields are optional except 'id'.
+        Only the fields provided in the request will be updated; others will remain unchanged.
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the workout to update. Required for update operations.
+        name:
+          type: string
+          description: Name of the workout.
+        description:
+          type: string
+          description: Description of the workout.
+        bodyPart:
+          type: string
+          description: Targeted body part for the workout.
+        equipment:
+          type: string
+          description: Equipment used in the workout.
+        target:
+          type: string
+          description: Primary muscle group targeted by the workout.
+        secondaryMuscles:
+          type: array
+          items:
+            type: string
+          description: List of secondary muscles involved in the workout.
+        instructions:
+          type: array
+          items:
+            type: string
+          description: Step-by-step instructions for performing the workout.
+        latestInstructions:
+          type: array
+          items:
+            type: string
+          description: Most recent instructions or tips for the workout.
+        isPublic:
+          type: boolean
+          description: Whether the workout is visible to all users.
+        youtubeLink:
+          type: string
+          format: uri
+          description: URL to a YouTube video demonstrating the workout.
+
+    MuscleCreate:
+      type: object
+      description: Schema for creating a new muscle.
+      properties:
+        Code:
+          type: string
+          description: Unique code for the muscle.
+        Muscle:
+          type: string
+          description: Name of the muscle.
+        Group:
+          type: string
+          description: Group name of the muscle.
+      required:
+        - Code
+        - Muscle
+        - Group
+
+    MuscleCreateArray:
+      type: array
+      description: Array of muscle objects to create in bulk.
+      items:
+        $ref: "#/components/schemas/MuscleCreate"
+
 paths:
   /workouts:
     get:
@@ -195,6 +264,7 @@ paths:
         required: true
         schema:
           type: integer
+        description: The unique ID of the workout to update.
     get:
       tags:
         - Workouts
@@ -209,16 +279,25 @@ paths:
     put:
       tags:
         - Workouts
-      summary: Update workout
+      summary: Update a workout by ID
+      description: |
+        Update a workout by its unique ID. Only the fields provided in the request body will be updated; all other fields will remain unchanged. This allows for partial updates.
+        Requires authentication and admin privileges.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Workout"
+              $ref: "#/components/schemas/WorkoutUpdate"
+            examples:
+              partialUpdate:
+                summary: Update only the name and instructions
+                value:
+                  name: "New Workout Name"
+                  instructions: ["Step 1", "Step 2"]
       responses:
         "200":
-          description: Workout updated successfully
+          description: The updated workout object
           content:
             application/json:
               schema:
@@ -317,23 +396,68 @@ paths:
                                   type: number
                                   format: float
 
+  /workouts/batch/update:
+    put:
+      tags:
+        - Workouts
+      summary: Bulk update multiple workouts
+      description: |
+        Update multiple workouts in a single request. Each object in the array must include the 'id' of the workout to update. Only the fields provided in each object will be updated; all other fields will remain unchanged. This is useful for efficiently updating many workouts at once. Requires authentication and admin privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkoutUpdate"
+            examples:
+              bulkUpdate:
+                summary: Update the name and isPublic status for multiple workouts
+                value:
+                  - id: 1
+                    name: "Push-Up Advanced"
+                    isPublic: true
+                  - id: 2
+                    name: "Squat Beginner"
+                    isPublic: false
+      responses:
+        "200":
+          description: Status and array of updated workout objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Status message for the bulk update operation.
+                  result:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Workout"
+                    description: Array of updated workout objects.
+
   /muscles:
     get:
       tags:
         - Muscles
       summary: Get all muscles
+      description: Retrieve a paginated list of all muscles in the database.
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+          description: Page number for pagination.
         - name: pageSize
           in: query
           schema:
             type: integer
             default: 20
             maximum: 50
+          description: Number of items per page.
       responses:
         "200":
           description: List of muscles
@@ -348,27 +472,57 @@ paths:
                         type: array
                         items:
                           $ref: "#/components/schemas/Muscle"
-
     post:
       tags:
         - Muscles
       summary: Create a new muscle
+      description: Create a new muscle entry. Requires authentication and admin privileges.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                Code:
-                  type: string
-                Muscle:
-                  type: string
-                Group:
-                  type: string
+              $ref: "#/components/schemas/MuscleCreate"
+            examples:
+              createMuscle:
+                summary: Create a muscle
+                value:
+                  Code: "TRI"
+                  Muscle: "Triceps Brachii"
+                  Group: "Upper Arm"
       responses:
         "201":
           description: Muscle created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Muscle"
+
+  /muscles/batch:
+    post:
+      tags:
+        - Muscles
+      summary: Bulk create muscles
+      description: Create multiple muscles in a single request. Requires authentication and admin privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MuscleCreateArray"
+            examples:
+              bulkCreate:
+                summary: Create multiple muscles
+                value:
+                  - Code: "TRI"
+                    Muscle: "Triceps Brachii"
+                    Group: "Upper Arm"
+                  - Code: "PEC"
+                    Muscle: "Pectoralis Major"
+                    Group: "Chest"
+      responses:
+        "201":
+          description: Muscles created successfully
           content:
             application/json:
               schema:
@@ -379,27 +533,32 @@ paths:
       tags:
         - Muscles
       summary: Get workouts by muscle
+      description: Retrieve all workouts associated with a specific muscle. Optionally filter by primary/secondary activation.
       parameters:
         - name: muscleId
           in: path
           required: true
           schema:
             type: string
+          description: The unique code of the muscle.
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+          description: Page number for pagination.
         - name: pageSize
           in: query
           schema:
             type: integer
             default: 20
             maximum: 50
+          description: Number of items per page.
         - name: isPrimary
           in: query
           schema:
             type: boolean
+          description: Filter by primary (true) or secondary (false) muscle activation.
       responses:
         "200":
           description: Workouts for the muscle
@@ -420,31 +579,94 @@ paths:
                                 activation:
                                   type: number
                                   format: float
+                                  description: Activation level of the muscle in the workout.
                                 isPrimary:
                                   type: boolean
+                                  description: Whether this muscle is a primary muscle for the workout.
                       muscle:
                         $ref: "#/components/schemas/Muscle"
+                        description: The muscle object for the requested muscleId.
+
+  /muscles/activations/bulk:
+    put:
+      tags:
+        - Muscles
+      summary: Bulk update muscle activations
+      description: Update muscle activation values for multiple workouts in bulk. Each object must include the workout_id, muscle_code, and activation value. Requires authentication and admin privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  workout_id:
+                    type: integer
+                    description: ID of the workout to update.
+                  name:
+                    type: string
+                    description: Name of the workout.
+                  muscle_code:
+                    type: string
+                    description: Code of the muscle to update.
+                  activation:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 1
+                    description: Activation value for the muscle (0-1).
+            examples:
+              bulkActivationUpdate:
+                summary: Update activations for multiple workouts
+                value:
+                  - workout_id: 1
+                    name: "Push-Up"
+                    muscle_code: "TRI"
+                    activation: 0.95
+                  - workout_id: 2
+                    name: "Bench Press"
+                    muscle_code: "PEC"
+                    activation: 0.92
+      responses:
+        "200":
+          description: Status of the bulk muscle activation update
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Status message for the operation.
+                  message:
+                    type: string
+                    description: Additional information about the update.
 
   /equipment:
     get:
       tags:
         - Equipment
       summary: Get all equipment
+      description: Retrieve a paginated list of all unique equipment names from the workouts database.
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+          description: Page number for pagination.
         - name: pageSize
           in: query
           schema:
             type: integer
             default: 20
             maximum: 50
+          description: Number of items per page.
       responses:
         "200":
-          description: List of equipment
+          description: List of unique equipment
           content:
             application/json:
               schema:
@@ -456,32 +678,37 @@ paths:
                         type: array
                         items:
                           type: string
+                        description: Array of unique equipment names.
 
   /equipment/{equipment}/workouts:
     get:
       tags:
         - Equipment
       summary: Get workouts by equipment
+      description: Retrieve all workouts associated with a specific equipment. Returns a paginated list of workouts for the given equipment.
       parameters:
         - name: equipment
           in: path
           required: true
           schema:
             type: string
+          description: The name of the equipment to filter workouts by.
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+          description: Page number for pagination.
         - name: pageSize
           in: query
           schema:
             type: integer
             default: 20
             maximum: 50
+          description: Number of items per page.
       responses:
         "200":
-          description: Workouts for the equipment
+          description: Workouts for the specified equipment
           content:
             application/json:
               schema:
@@ -493,29 +720,34 @@ paths:
                         type: array
                         items:
                           $ref: "#/components/schemas/Workout"
+                        description: Array of workout objects for the specified equipment.
                       equipment:
                         type: string
+                        description: The equipment for which workouts are returned.
 
   /body-parts:
     get:
       tags:
         - Body Parts
       summary: Get all body parts
+      description: Retrieve a paginated list of all unique body parts from the workouts database.
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+          description: Page number for pagination.
         - name: pageSize
           in: query
           schema:
             type: integer
             default: 20
             maximum: 50
+          description: Number of items per page.
       responses:
         "200":
-          description: List of body parts
+          description: List of unique body parts
           content:
             application/json:
               schema:
@@ -527,32 +759,37 @@ paths:
                         type: array
                         items:
                           type: string
+                        description: Array of unique body part names.
 
   /body-parts/{bodyPart}/workouts:
     get:
       tags:
         - Body Parts
       summary: Get workouts by body part
+      description: Retrieve all workouts associated with a specific body part. Returns a paginated list of workouts for the given body part.
       parameters:
         - name: bodyPart
           in: path
           required: true
           schema:
             type: string
+          description: The name of the body part to filter workouts by.
         - name: page
           in: query
           schema:
             type: integer
             default: 1
+          description: Page number for pagination.
         - name: pageSize
           in: query
           schema:
             type: integer
             default: 20
             maximum: 50
+          description: Number of items per page.
       responses:
         "200":
-          description: Workouts for the body part
+          description: Workouts for the specified body part
           content:
             application/json:
               schema:
@@ -564,5 +801,59 @@ paths:
                         type: array
                         items:
                           $ref: "#/components/schemas/Workout"
+                        description: Array of workout objects for the specified body part.
                       bodyPart:
                         type: string
+                        description: The body part for which workouts are returned.
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns a simple status message to indicate the API is running.
+      responses:
+        "200":
+          description: API health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                    description: Health status of the API.
+              examples:
+                healthy:
+                  summary: Healthy response
+                  value:
+                    status: ok
+
+  /health/ping:
+    get:
+      tags:
+        - Health
+      summary: Ping the API and database
+      description: Returns a status message and the database ping latency in milliseconds.
+      responses:
+        "200":
+          description: API and database ping status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: pong
+                    description: Ping status of the API.
+                  latency:
+                    type: integer
+                    description: Database ping latency in milliseconds.
+              examples:
+                ping:
+                  summary: Ping response
+                  value:
+                    status: pong
+                    latency: 3
