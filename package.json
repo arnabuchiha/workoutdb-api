@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "dotenv -e .dev.vars -- wrangler dev",
     "env": "dotenv -e .dev.vars",
-    "build": "cd frontend && bun run build",
+    "build": "cd frontend && bun install && bun run build",
     "deploy": "wrangler deploy --minify",
     "db:drop": "dotenv -e .dev.vars -- tsx src/db/drop-tables.ts",
     "db:generate": "dotenv -e .dev.vars -- drizzle-kit generate",
